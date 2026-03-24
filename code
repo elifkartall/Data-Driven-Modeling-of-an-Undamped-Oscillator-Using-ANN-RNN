@@ -1,0 +1,201 @@
+# ================================
+# 1. KÜTÜPHANELER
+# ================================
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.integrate import solve_ivp
+from sklearn.model_selection import train_test_split
+import torch
+import torch.nn as nn
+
+# ================================
+# 2. SİSTEM (OSC_2)
+# ================================
+a = 0.5
+b = -0.5
+
+def system(t, y):
+    x1, x2 = y
+    dx1dt = a * x2
+    dx2dt = b * x1
+    return [dx1dt, dx2dt]
+
+# ================================
+# 3. TRAJECTORY ÜRETİMİ
+# ================================
+def generate_trajectory(ic):
+    t_span = (0, 10)
+    t_eval = np.linspace(0, 10, 200)  # dt ≈ 0.05
+    sol = solve_ivp(system, t_span, ic, t_eval=t_eval)
+    return sol.y.T
+
+# ================================
+# 4. INITIAL CONDITIONS
+# ================================
+initial_conditions = np.random.uniform(-1, 1, (100, 2))
+
+train_ic, test_ic = train_test_split(initial_conditions, test_size=0.2)
+
+# ================================
+# 5. DATASET OLUŞTURMA (DELTA)
+# ================================
+def create_dataset(ic_list):
+    X, Y = [], []
+    for ic in ic_list:
+        traj = generate_trajectory(ic)
+        for i in range(len(traj)-1):
+            X.append(traj[i])
+            Y.append(traj[i+1] - traj[i])
+    return np.array(X), np.array(Y)
+
+X_train, Y_train = create_dataset(train_ic)
+X_test, Y_test = create_dataset(test_ic)
+
+# ================================
+# 6. NORMALIZATION
+# ================================
+X_mean = X_train.mean(axis=0)
+X_std = X_train.std(axis=0)
+
+X_train = (X_train - X_mean) / X_std
+X_test = (X_test - X_mean) / X_std
+
+Y_train = Y_train / X_std
+Y_test = Y_test / X_std
+
+# tensor
+X_train = torch.FloatTensor(X_train)
+Y_train = torch.FloatTensor(Y_train)
+X_test = torch.FloatTensor(X_test)
+Y_test = torch.FloatTensor(Y_test)
+
+# ================================
+# 7. ANN MODEL
+# ================================
+class ANN(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(2, 64),
+            nn.Tanh(),
+            nn.Linear(64, 64),
+            nn.Tanh(),
+            nn.Linear(64, 2)
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
+# ================================
+# 8. RESNET MODEL
+# ================================
+class ResNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(2, 64),
+            nn.Tanh(),
+            nn.Linear(64, 2)
+        )
+
+    def forward(self, x):
+        return self.net(x)  # delta öğreniyor
+
+# ================================
+# 9. TRAIN FUNCTION
+# ================================
+def train_model(model, X, Y, epochs=100):
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+    loss_fn = nn.MSELoss()
+
+    losses = []
+
+    for epoch in range(epochs):
+        pred = model(X)
+        loss = loss_fn(pred, Y)
+
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+        losses.append(loss.item())
+
+        if epoch % 20 == 0:
+            print(f"Epoch {epoch}, Loss: {loss.item()}")
+
+    return losses
+
+# ================================
+# 10. TRAIN
+# ================================
+ann_model = ANN()
+res_model = ResNet()
+
+print("Training ANN...")
+ann_loss = train_model(ann_model, X_train, Y_train)
+
+print("\nTraining ResNet...")
+res_loss = train_model(res_model, X_train, Y_train)
+
+# ================================
+# 11. LOSS GRAFİĞİ
+# ================================
+plt.plot(ann_loss, label="ANN")
+plt.plot(res_loss, label="ResNet")
+plt.legend()
+plt.title("Loss Comparison")
+plt.show()
+
+# ================================
+# 12. TEST ERROR (KRİTİK)
+# ================================
+def evaluate(model, X, Y):
+    pred = model(X)
+    return torch.mean((pred - Y)**2).item()
+
+print("\nTest Results:")
+print("ANN Test Loss:", evaluate(ann_model, X_test, Y_test))
+print("ResNet Test Loss:", evaluate(res_model, X_test, Y_test))
+
+# ================================
+# 13. TRAJECTORY PREDICTION
+# ================================
+def predict_trajectory(model, ic, steps=200):
+    traj = [ic]
+    current = np.array(ic)
+
+    for _ in range(steps):
+        norm = (current - X_mean) / X_std
+        norm = torch.FloatTensor(norm)
+
+        delta = model(norm).detach().numpy()
+        delta = delta * X_std
+
+        current = current + delta
+        traj.append(current)
+
+    return np.array(traj)
+
+# ================================
+# 14. KARŞILAŞTIRMA
+# ================================
+ic = [0.9, -0.9]
+
+true_traj = generate_trajectory(ic)
+ann_traj = predict_trajectory(ann_model, ic)
+res_traj = predict_trajectory(res_model, ic)
+
+plt.plot(true_traj[:,0], true_traj[:,1], label="True")
+plt.plot(ann_traj[:,0], ann_traj[:,1], '--', label="ANN")
+plt.plot(res_traj[:,0], res_traj[:,1], '--', label="ResNet")
+plt.legend()
+plt.title("Trajectory Comparison")
+plt.show()
+
+plt.figure()
+plt.plot(true_traj[:,0], label="True x1")
+plt.plot(ann_traj[:,0], '--', label="ANN x1")
+plt.plot(res_traj[:,0], '--', label="ResNet x1")
+plt.legend()
+plt.title("Time Series Comparison")
+plt.show()
