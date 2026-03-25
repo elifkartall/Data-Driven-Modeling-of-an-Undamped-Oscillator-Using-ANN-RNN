@@ -68,4 +68,4 @@ ANN achieves faster and more stable convergence
 
 📝 Report
 ---
-You can access the **detailed report here:** [here](https://drive.google.com/file/d/1NV0IGyc8UD3vcmSbajz3gcOhiVClEGtw/view?usp=sharing), and the [here](https://github.com/elifkartall/Data-Driven-Modeling-of-an-Undamped-Oscillator-Using-ANN-RNN/blob/main/Data-Driven%20Modeling%20of%20an%20Undamped%20Oscillator%20Using%20Artificial%20Neural%20Networks%20and%20Residual%20Neural%20Networks.pdf).
+You can access the **detailed report here:** [here](https://drive.google.com/file/d/1NV0IGyc8UD3vcmSbajz3gcOhiVClEGtw/view?usp=sharing), or [here](https://github.com/elifkartall/Data-Driven-Modeling-of-an-Undamped-Oscillator-Using-ANN-RNN/blob/main/Data-Driven%20Modeling%20of%20an%20Undamped%20Oscillator%20Using%20Artificial%20Neural%20Networks%20and%20Residual%20Neural%20Networks.pdf).
